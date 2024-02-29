@@ -1,0 +1,1119 @@
+---
+title: "Virus_analysis"
+author: "Jamilla"
+date: "2023-10-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_knit$set(root.dir = "C:\\Users\\jamil\\OneDrive\\Documenten\\HU Life Sciences\\Afstudeerfase\\project\\dystrophy\\virus_analysis\\")
+
+```
+
+```{r load packages and data, include=FALSE}
+library(DESeq2)
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(tidyr)
+library(ashr)
+library(ggrepel)
+library(pheatmap)
+library(org.Hs.eg.db)
+library(GOstats)
+
+counts <- read.table("data/exp2.counts", header = TRUE)
+counts <- as.data.frame(counts)
+
+gene_info <- counts[, 1:6]
+counts <- counts[, 7:29]
+counts$Geneid <- gene_info$Geneid
+rownames(counts) <- counts$Geneid
+counts <- subset(counts, select = -Geneid)
+metadata <- read.csv("data/metadata_virus.csv")
+
+
+
+```
+
+```{r read counts, include=FALSE}
+
+total_counts <- colSums(counts[, -1])
+
+
+```
+
+```{r DESeq object, include= FALSE}
+
+
+# filter counts; genes with zero expression in every sample excluded
+filtered_counts <- counts[rowSums(counts) > 0, ]
+
+filtered_counts <- as.matrix(filtered_counts)
+
+# 'filtered_counts_matrix' will now contain genes with non-zero counts in at least one sample
+
+# add a small pseudocount to the counts, because rlog/vst does not work for 0 
+pseudocount <- 1 # adjust as needed
+counts_with_pseudocount <- filtered_counts + pseudocount
+
+# copy the columns 1:3 and 19:23 to a new matrix
+counts_with_pseudocount_24_A2 <- counts_with_pseudocount[, c(1:3, 19:23)]
+counts_with_pseudocount_48_A2 <- counts_with_pseudocount[, c(4:6, 19:23)]
+counts_with_pseudocount_72_A2 <- counts_with_pseudocount[, c(7:9, 19:23)]
+counts_with_pseudocount_24_B3 <- counts_with_pseudocount[, c(10:12, 19:23)]
+counts_with_pseudocount_48_B3 <- counts_with_pseudocount[, c(13:15, 19:23)]
+counts_with_pseudocount_72_B3 <- counts_with_pseudocount[, c(16:18, 19:23)]
+counts_with_pseudocounts_IFNB <- counts_with_pseudocount[, c(19:23)]
+
+# do same for metadata
+metadata_24_A2 <- metadata[c(1:3, 19:23), ]
+metadata_48_A2 <- metadata[c(4:6, 19:23), ]
+metadata_72_A2 <- metadata[c(7:9, 19:23), ]
+metadata_24_B3 <- metadata[c(10:12, 19:23), ]
+metadata_48_B3 <- metadata[c(13:15, 19:23), ]
+metadata_72_B3 <- metadata[c(16:18, 19:23), ]
+metadata_INFB <- metadata[c(19:23), ]
+
+# create a list with the datasets and metadata
+datasets <- list(counts_with_pseudocount_24_A2, 
+                 counts_with_pseudocount_48_A2, 
+                 counts_with_pseudocount_72_A2, 
+                 counts_with_pseudocount_24_B3, 
+                 counts_with_pseudocount_48_B3, 
+                 counts_with_pseudocount_72_B3,
+                 counts_with_pseudocounts_IFNB)
+metadata_list <- list(metadata_24_A2, 
+                      metadata_48_A2, 
+                      metadata_72_A2, 
+                      metadata_24_B3, 
+                      metadata_48_B3, 
+                      metadata_72_B3, 
+                      metadata_INFB)
+# add names to the list
+names(datasets) <- c("Condition_A2_Time_24", "Condition_A2_Time_48", "Condition_A2_Time_72", "Condition_B3_Time_24", "Condition_B3_Time_48", "Condition_B3_Time_72", "Condition_IFNB")
+
+# loop through the list and create a deseqdataset for each dataset
+for (i in 1:length(datasets)) {
+  datasets[[i]] <- DESeqDataSetFromMatrix(countData = datasets[[i]],
+                              colData = metadata_list[[i]],
+                              design = ~ condition)
+}
+
+# differential gene expression analysis for each dataset
+for (i in 1:length(datasets)) {
+  datasets[[i]] <- DESeq(datasets[[i]])
+}
+```
+
+
+```{r DGE analysis summary, include=FALSE}
+# calculate the results for each dataset
+results_list <- list()
+for (i in 1:length(datasets)) {
+  results_list[[i]] <- results(datasets[[i]])
+}
+# add names
+names(results_list) <- c("Condition_A2_Time_24", "Condition_A2_Time_48", "Condition_A2_Time_72", "Condition_B3_Time_24", "Condition_B3_Time_48", "Condition_B3_Time_72", "Condition_IFNB")
+```
+
+Differential gene expression was calculated for both conditions at each timepoint. Always comparing to the mock condition. The results are shown below.
+
+dataset 1: Condition_A2_Time_24
+dataset 2: Condition_A2_Time_48
+dataset 3: Condition_A2_Time_72
+dataset 4: Condition_B3_Time_24
+dataset 5: Condition_B3_Time_48
+dataset 6: Condition_B3_Time_72
+dataset 7: Condition_IFNB
+
+```{r DGE analysis print summary, echo=FALSE}
+# print the summary for each of the results
+
+for (i in 1:length(results_list)) {
+  print(paste("Summary for dataset", i, ":", sep = " "))
+  print(summary(results_list[[i]]))
+}
+
+
+```
+
+
+
+
+
+```{r significant genes, include=FALSE}
+sig_genes_list <- list()
+for (i in 1:length(results_list)) {
+  # Check for NAs in the padj column and subset accordingly
+  sig_genes_list[[i]] <- results_list[[i]][!is.na(results_list[[i]]$padj) & results_list[[i]]$padj < 0.05, ]
+}
+
+```
+
+```{r significant genes write, echo=FALSE}
+# write the significant genes to a file
+for (i in 1:length(sig_genes_list)) {
+  write.table(sig_genes_list[[i]], file = paste("data/sig_genes_dataset", i, ".txt", sep = ""), sep = "\t")
+}
+
+```
+
+For the INFB condition, differential expression analysis results are plotted below. The plot shows the log2FoldChange vs baseMean for each gene. The genes that are most upregulated in the INFB condition are labelled. The genes are also colored in a scale for p-value. 
+```{r logFC vs base mean, echo=FALSE, fig.width=7, fig.height=7, message=FALSE, warning=FALSE}
+# load data
+
+results <- results_list$Condition_IFNB
+results <- as.data.frame(results)
+results$gene_id <- rownames(results)
+
+# Specify genes to label
+genes_to_label <- c("OAS1", "OAS3", "IFITM1", "ISG15", rownames(head(results[order(results$log2FoldChange),], 5)))
+
+# Create the plot
+p <- ggplot(results) +
+  geom_point(aes(x = log2FoldChange, y = log2(baseMean), color = results$padj), size = 1) +
+  labs(x = "log2FoldChange", y = "baseMean") + 
+  labs(color = "Adjusted p-value: ") + 
+  ggtitle("log2FoldChange vs baseMean in mock vs INFB") +
+  theme(
+    legend.key.width = unit(1, "cm"),  
+    legend.key.height = unit(0.5, "cm"),  
+    legend.text = element_text(size = 4),  
+    legend.title = element_text(size = 5),
+    plot.caption = element_text(hjust = 0)  # Adjust the caption position
+  ) 
+
+
+# Add labels for specific genes
+p <- p + geom_text_repel(data = results[results$gene_id %in% genes_to_label, ],
+                         aes(x = log2FoldChange,
+                             y = log2(baseMean),
+                             label = gene_id),
+                         box.padding = 0.5,
+                         force = 1,
+                         segment.color = "green",
+                         segment.size = 0.2)
+print(p)
+
+```
+
+To visualize the gene expression of significant genes over time in the A2 infected cells, a heatmap is shown below. here, red shows upregulation and blue shows downregulation. The genes are clustered by hierarchical clustering.
+
+```{r heatmap A2, echo=FALSE, fig.width=5, fig.height=7}
+# load data
+results_A2 <- results_list$Condition_A2_Time_24
+results_A2_1 <- results_list$Condition_A2_Time_48
+results_A2_2 <- results_list$Condition_A2_Time_72
+
+results_A2 <- results_A2[!is.na(results_A2$padj) &
+                               results_A2$padj < 0.01 &
+                               (results_A2$log2FoldChange < -1.5 |
+                               results_A2$log2FoldChange > 1.5), ]
+results_A2 <- as.data.frame(results_A2)
+
+results_A2_1 <- results_A2_1[!is.na(results_A2_1$padj) &
+                               results_A2_1$padj < 0.01 &
+                               (results_A2_1$log2FoldChange < -1.5 |
+                               results_A2_1$log2FoldChange > 1.5), ]
+results_A2_1 <- as.data.frame(results_A2_1)
+
+results_A2_2 <- results_A2_2[!is.na(results_A2_2$padj) &
+                               results_A2_2$padj < 0.01 &
+                               (results_A2_2$log2FoldChange < -1.5 |
+                               results_A2_2$log2FoldChange > 1.5), ]
+results_A2_2 <- as.data.frame(results_A2_2)
+
+# find the shared genes in the three timepoints
+x <- rownames(results_A2)
+y <- rownames(results_A2_1)
+z <- rownames(results_A2_2)
+
+shared_genes_A2 <- intersect(x, y)
+shared_genes_A2 <- intersect(shared_genes_A2, z)
+shared_genes_A2 <- as.data.frame(shared_genes_A2)
+
+unique_genes_A2 <- c(x, y, z)
+unique_genes_A2 <- as.data.frame(unique_genes_A2) %>% unique()
+
+
+# extract counts from deseq datasets
+counts_A2_24 <- counts(datasets$Condition_A2_Time_24, normalized = TRUE)
+counts_A2_48 <- counts(datasets$Condition_A2_Time_48, normalized = TRUE)
+counts_A2_72 <- counts(datasets$Condition_A2_Time_72, normalized = TRUE)
+
+# calculate mean for mock and A3
+mock <- rowMeans(counts_A2_24[, 6:8])
+mock <- as.data.frame(mock)
+colnames(mock) <- "mock"
+
+A2_24 <- rowMeans(counts_A2_24[, 1:3])
+A2_24 <- as.data.frame(A2_24)
+colnames(A2_24) <- "24"
+
+A2_48 <- rowMeans(counts_A2_48[, 1:3])
+A2_48 <- as.data.frame(A2_48)
+colnames(A2_48) <- "48"
+
+A2_72 <- rowMeans(counts_A2_72[, 1:3])
+A2_72 <- as.data.frame(A2_72)
+colnames(A2_72) <- "72"
+
+# create table with genes as rows, mean counts as cols: mock, 24, 48, 72
+unique_genes_A2$mock <- mock$mock[match(unique_genes_A2$unique_genes_A2,
+                                                          rownames(A2_24))]
+unique_genes_A2$"24h" <- A2_24$"24"[match(unique_genes_A2$unique_genes_A2,
+                                                          rownames(A2_24))]
+unique_genes_A2$"48h" <- A2_48$"48"[match(unique_genes_A2$unique_genes_A2,
+                                                          rownames(A2_48))]
+unique_genes_A2$"72h" <- A2_72$"72"[match(unique_genes_A2$unique_genes_A2,
+                                                          rownames(A2_72))]
+
+rownames(unique_genes_A2) <- unique_genes_A2$unique_genes_A2
+
+pheatmap_A2 <- pheatmap(unique_genes_A2[, 2:5], 
+                        scale = "row", 
+                        show_rownames = FALSE, 
+                        cluster_rows = TRUE, 
+                        cluster_cols = FALSE, 
+                        fontsize = 5,
+                        main = "Heatmap for gene expression as a function of time in A2 virus infected neurons")
+
+
+```
+To determine clustering sizes, the dendrogram extracted from the heatmap is shown below. 
+```{r dendrogram A2, echo=FALSE, fig.width=5, fig.height=5}
+
+plot(pheatmap_A2$tree_row, 
+     main = "Dendrogram for A2 virus infected neurons")
+     
+
+
+```
+
+
+
+```{r clusters A2, echo=FALSE, fig.width=4, fig.height=3}
+
+#extract clusters 
+clusters_A2 <- cbind(unique_genes_A2[, 2:5],
+                     cluster = cutree(pheatmap_A2$tree_row,
+                                      k = 9))
+
+clusters_A2_list <- list()
+
+# find genes in each cluster with a loop
+for (i in 1:9) {
+  assign(paste0("cluster_A2_", i), clusters_A2[clusters_A2$cluster == i, ])
+  clusters_A2_list[[i]] <- get(paste0("cluster_A2_", i))
+}
+
+
+
+
+```
+
+From the previous heatmap, 9 clusters were extracted. The following graphs show the relative gene expression for each cluster as a function of time. 
+
+```{r clustergraphs A2, echo=FALSE, fig.width=4, fig.height=3}
+# Create a list to store the long-format data frames
+long_format_clusters <- list()
+
+# Loop through each cluster
+for (i in 1:length(clusters_A2_list)) {
+  # Subset the data for the current cluster
+  current_cluster <- get(paste0("cluster_A2_", i))
+  current_cluster <- as.data.frame(current_cluster)
+
+  # Calculate the mean expression for the current cluster
+  cluster_mean <- rowMeans(current_cluster[, 1:4])
+  cluster_stdev <- apply(current_cluster[, 1:4], 1, sd)
+
+  # Calculate relative gene expression by subtracting the cluster mean
+  current_cluster[, 1:4] <- (current_cluster[, 1:4] - cluster_mean) / cluster_stdev
+  current_cluster[, 1:4] <- sapply(current_cluster[, 1:4], 
+                                   function(x) ifelse(x < -3, -3, 
+                                                      ifelse(x > 3, 3, x)))
+
+  # Convert the current cluster to long format
+  current_cluster_long <- tidyr::pivot_longer(current_cluster, 
+    cols = c("mock", "24h", "48h", "72h"),
+    names_to = "timepoint", values_to = "relative_expression"
+  )
+  
+  # Add a column to store gene names
+  current_cluster_long$gene <- rep(rownames(current_cluster), each = 4) # Repeat each gene name for the 4 timepoints
+  
+  # Reorder the levels of the "timepoint" factor to have "mock" first
+  current_cluster_long$timepoint <- factor(current_cluster_long$timepoint, levels = c("mock", "24h", "48h", "72h"))
+
+  # Create a ggplot for the current cluster
+  plot <- ggplot(current_cluster_long, aes(x = timepoint,
+                                           y = relative_expression,
+                                           group = gene,
+                                           color = gene)) +
+    geom_point() +
+    geom_line() +
+    labs(title = paste0("Cluster ", i)) +
+    labs(x = "Timepoint", y = "z-score") +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+    )
+
+  # Show the plot
+  print(plot)
+}
+
+
+```
+
+
+For every cluster, GO term enrichment analysis is performed and visualized in the graphs below. 
+```{r GO term enrichment A2, include=FALSE}
+
+# create object with all the gene names in dataset for universe
+all_genes <- rownames(counts)
+all_genes <- mapIds(org.Hs.eg.db, ## convert gene ids to Entrez IDs
+                    keys = all_genes, 
+                    column = "ENTREZID", 
+                    keytype = "SYMBOL")
+
+# create list to store go term analysis results
+goterm_results_A2 <- list()
+
+# go term enrichment analysis for every cluster in the cluster list
+for (i in 1:length(clusters_A2_list)) {
+  # object with names of all significant genes
+  sign_genes_A2 <- rownames(clusters_A2_list[[i]])
+  
+  # convert gene IDs to Entrez IDs
+  sign_genes_A2 <- mapIds(org.Hs.eg.db, 
+                          keys = sign_genes_A2,
+                          column = "ENTREZID", 
+                          keytype = "SYMBOL")
+  
+
+  # Perform GO term enrichment analysis
+  test_object_A2 <- new("GOHyperGParams",
+                        geneIds = sign_genes_A2,
+                        universeGeneIds = all_genes, 
+                        annotation = "org.Hs.eg.db", 
+                        ontology = "BP", 
+                        pvalueCutoff = 1,
+                        testDirection = "over")
+  
+  # save current results in the list
+  goterm_results_A2[[i]] <- hyperGTest(test_object_A2)
+  }
+
+```
+
+The genes in A2 clusters:
+```{r genes in clusters A2, echo=FALSE}
+# create list to store gene names for every cluster
+genes_in_clusters_A2 <- list()
+
+# loop through every cluster
+for (i in 1:length(clusters_A2_list)) {
+  # extract gene names for current cluster
+  genes_in_clusters_A2[[i]] <- rownames(clusters_A2_list[[i]])
+}
+
+# save lists
+# write the significant genes to a file
+for (i in 1:length(genes_in_clusters_A2)) {
+  write.table(genes_in_clusters_A2[[i]], file = paste("data/clusters_A2_", i, ".txt", sep = ""), sep = "\t")
+}
+
+print(genes_in_clusters_A2)
+
+```
+
+
+
+```{r visual goterms A2, echo=FALSE, fig.width=5, fig.height=7}
+summary_A2_GO <- list()
+for (i in 1:length(goterm_results_A2)) {
+   goterm_analysis_results_A2 <- summary(goterm_results_A2[[i]])
+   # filter for counts >5 and < 500?
+    goterm_analysis_results_A2 <- goterm_analysis_results_A2 %>% 
+    filter(Count > 5) %>% 
+    filter(Count < 500)
+   
+   # adjust p-values for multple testing
+   goterm_analysis_results_A2$padj <- p.adjust(goterm_analysis_results_A2$Pvalue, 
+                                              method = "BH")
+   summary_A2_GO[[i]] <- goterm_analysis_results_A2 %>% as.data.frame()
+}
+
+summary_A2_GO_df <- c(summary_A2_GO[[1]]$Term, 
+                      summary_A2_GO[[2]]$Term, 
+                      summary_A2_GO[[3]]$Term, 
+                      summary_A2_GO[[4]]$Term, 
+                      summary_A2_GO[[5]]$Term) %>% as.data.frame()
+summary_A2_GO_df <- unique(summary_A2_GO_df)
+rownames(summary_A2_GO_df) <- summary_A2_GO_df$.
+
+summary_A2_GO_df$cluster_1 <- summary_A2_GO[[1]]$padj[match(summary_A2_GO_df$., 
+                                                             summary_A2_GO[[1]]$Term)]
+summary_A2_GO_df$cluster_2 <- summary_A2_GO[[2]]$padj[match(summary_A2_GO_df$.,
+                                                             summary_A2_GO[[2]]$Term)]
+summary_A2_GO_df$cluster_3 <- summary_A2_GO[[3]]$padj[match(summary_A2_GO_df$.,
+                                                             summary_A2_GO[[3]]$Term)]
+summary_A2_GO_df$cluster_4 <- summary_A2_GO[[4]]$padj[match(summary_A2_GO_df$.,
+                                                             summary_A2_GO[[4]]$Term)]
+summary_A2_GO_df$cluster_5 <- summary_A2_GO[[5]]$padj[match(summary_A2_GO_df$.,
+                                                             summary_A2_GO[[5]]$Term)]
+
+
+                                                            
+                                
+
+
+# replace all NAs by 0
+summary_A2_GO_df[is.na(summary_A2_GO_df)] <- 0
+summary_A2_GO_df <- summary_A2_GO_df[, -1]
+# remove all rows with 0 in all columns
+
+
+
+```
+
+
+
+
+
+
+To visualize the gene expression of significant genes over time in the B3 infected cells, a heatmap is shown below. here, red shows upregulation and blue shows downregulation. The genes are clustered by hierarchical clustering.
+
+```{r heatmap B3, echo=FALSE, fig.width=5, fig.height=7}
+# do same for B3
+results_B3 <- results_list$Condition_B3_Time_24
+results_B3_1 <- results_list$Condition_B3_Time_48
+results_B3_2 <- results_list$Condition_B3_Time_72
+
+results_B3 <- results_B3[!is.na(results_B3$padj) &
+                          results_B3$padj < 0.01 &
+                           (results_B3$log2FoldChange < -1.5 |
+                           results_B3$log2FoldChange > 1.5), ]
+
+results_B3 <- as.data.frame(results_B3)
+
+results_B3_1 <- results_B3_1[!is.na(results_B3_1$padj) &
+                          results_B3_1$padj < 0.01 &
+                           (results_B3_1$log2FoldChange < -1.5 |
+                           results_B3_1$log2FoldChange > 1.5), ]
+results_B3_1 <- as.data.frame(results_B3_1)
+
+results_B3_2 <- results_B3_2[!is.na(results_B3_2$padj) &
+                            results_B3_2$padj < 0.01 &
+                           (results_B3_2$log2FoldChange < -1.5 |
+                           results_B3_2$log2FoldChange > 1.5), ]
+results_B3_2 <- as.data.frame(results_B3_2)
+
+
+# find the shared genes in the three timepoints
+a <- rownames(results_B3)
+b <- rownames(results_B3_1)
+c <- rownames(results_B3_2)
+
+shared_genes_B3 <- intersect(a, b)
+shared_genes_B3 <- intersect(shared_genes_B3, c)
+shared_genes_B3 <- as.data.frame(shared_genes_B3)
+
+unique_genes_B3 <- c(a, b, c)
+unique_genes_B3 <- as.data.frame(unique_genes_B3) %>% unique()
+
+# extract counts from deseq datasets
+counts_B3_24 <- counts(datasets$Condition_B3_Time_24, normalized = TRUE)
+counts_B3_48 <- counts(datasets$Condition_B3_Time_48, normalized = TRUE)
+counts_B3_72 <- counts(datasets$Condition_B3_Time_72, normalized = TRUE)
+
+B3_24 <- rowMeans(counts_B3_24[, 1:3])
+B3_24 <- as.data.frame(B3_24)
+colnames(B3_24) <- "24"
+
+B3_48 <- rowMeans(counts_B3_48[, 1:3])
+B3_48 <- as.data.frame(B3_48)
+colnames(B3_48) <- "48"
+
+B3_72 <- rowMeans(counts_B3_72[, 1:3])
+B3_72 <- as.data.frame(B3_72)
+colnames(B3_72) <- "72"
+
+# create table with genes as rows, mean counts as cols: mock, 24, 48, 72
+unique_genes_B3$mock <- mock$mock[match(unique_genes_B3$unique_genes_B3,
+                                                          rownames(B3_24))]
+unique_genes_B3$"24h" <- B3_24$"24"[match(unique_genes_B3$unique_genes_B3,
+                                                          rownames(B3_24))]
+unique_genes_B3$"48h" <- B3_48$"48"[match(unique_genes_B3$unique_genes_B3,
+                                                          rownames(B3_48))]
+unique_genes_B3$"72h" <- B3_72$"72"[match(unique_genes_B3$unique_genes_B3,
+                                                          rownames(B3_72))]
+
+rownames(unique_genes_B3) <- unique_genes_B3$unique_genes_B3
+
+
+pheatmap_B3 <- pheatmap(unique_genes_B3[, 2:5], 
+                        scale = "row", 
+                        show_rownames = FALSE, 
+                        cluster_rows = TRUE, 
+                        cluster_cols = FALSE, 
+                        fontsize = 4,
+                        main = "Heatmap for gene expression as a function of time in B3 virus infected neurons")
+```
+
+To determine clustering sizes, the dendrogram extracted from the heatmap is shown below. 
+
+```{r dendrogram B3, echo=FALSE, fig.width=5, fig.height=5}
+# Extract dendrogram
+plot(pheatmap_B3$tree_row, main = "Dendrogram for B3 virus infected neurons")
+
+```
+
+```{r clusters B3, include=FALSE}
+# Extract clusters
+clusters_B3 <- cbind(unique_genes_B3[, 2:5],
+                     cluster = cutree(pheatmap_B3$tree_row, k = 9))
+
+clusters_B3_list <- list()
+
+# Find genes in each cluster with a loop
+for (i in 1:5) {
+  assign(paste0("cluster_B3_", i), clusters_B3[clusters_B3$cluster == i, ])
+  clusters_B3_list[[i]] <- get(paste0("cluster_B3_", i))
+}
+```
+
+From the previous heatmap, 9 clusters were extracted. The following graphs show the relative gene expression for each cluster as a function of time. 
+
+```{r cluster graphs B3, echo=FALSE, fig.width=4, fig.height=3}
+# Create a list to store the long-format data frames
+long_format_clusters <- list()
+
+# Loop through each cluster
+for (i in 1:5) {
+  # Subset the data for the current cluster
+  current_cluster <- get(paste0("cluster_B3_", i))
+  current_cluster <- as.data.frame(current_cluster)
+
+  # Calculate the mean expression for the current cluster
+  cluster_mean <- rowMeans(current_cluster[, 1:4])
+  cluster_stdev <- apply(current_cluster[, 1:4], 1, sd)
+
+  # Calculate relative gene expression by subtracting the cluster mean
+  current_cluster[, 1:4] <- (current_cluster[, 1:4] - cluster_mean) / cluster_stdev
+  current_cluster[, 1:4] <- sapply(current_cluster[, 1:4], function(x) ifelse(x < -3, -3, ifelse(x > 3, 3, x)))
+  
+  
+
+  # Convert the current cluster to long format
+  current_cluster_long <- tidyr::pivot_longer(current_cluster, 
+    cols = c("mock", "24h", "48h", "72h"),
+    names_to = "timepoint", values_to = "relative_expression"
+  )
+  
+  # Add a column to store gene names
+  current_cluster_long$gene <- rep(rownames(current_cluster), each = 4) # Repeat each gene name for the 4 timepoints
+  
+  # Reorder the levels of the "timepoint" factor to have "mock" first
+  current_cluster_long$timepoint <- factor(current_cluster_long$timepoint, 
+                                           levels = c("mock", "24h", "48h", "72h"))
+
+  # Create a ggplot for the current cluster
+  plot <- ggplot(current_cluster_long, aes(x = timepoint,
+                                           y = relative_expression,
+                                           group = gene,
+                                           color = gene)) +
+    geom_point() +
+    geom_line() +
+    labs(title = paste0("Cluster ", i)) +
+    labs(x = "Timepoint", y = "z-score") +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+    )
+
+  # Show the plot
+  print(plot)
+}
+
+
+```
+The genes in B3 clusters:
+```{r genes in clusters B3, include=FALSE}
+# create list to store gene names for every cluster
+genes_in_clusters_B3 <- list()
+
+# loop through every cluster
+for (i in 1:5) {
+  # extract gene names for current cluster
+  genes_in_clusters_B3[[i]] <- rownames(clusters_B3_list[[i]])
+}
+
+# save lists
+# write the significant genes to a file
+for (i in 1:length(genes_in_clusters_B3)) {
+  write.table(genes_in_clusters_B3[[i]], file = paste("data/clusters_B3_", i, ".txt", sep = ""), sep = "\t")
+}
+
+print(genes_in_clusters_B3)
+```
+
+
+For every cluster, GO term enrichtment analysis is performed and visualized in the heatmap below.
+```{r GO term enrichment B3, include=FALSE}
+
+# create list to store go term analysis results
+goterm_results_B3 <- list()
+
+# go term enrichment analysis for every cluster in the cluster list
+for (i in 1:5) {
+  # object with names of all significant genes
+  sign_genes_B3 <- rownames(clusters_B3_list[[i]])
+  
+  # convert gene IDs to Entrez IDs
+  sign_genes_B3 <- mapIds(org.Hs.eg.db, 
+                          keys = sign_genes_B3,
+                          column = "ENTREZID", 
+                          keytype = "SYMBOL")
+  
+
+  # Perform GO term enrichment analysis
+  test_object_B3 <- new("GOHyperGParams",
+                        geneIds = sign_genes_B3,
+                        universeGeneIds = all_genes, 
+                        annotation = "org.Hs.eg.db", 
+                        ontology = "BP", 
+                        pvalueCutoff = 1,
+                        testDirection = "over")
+  
+  # save current results in the list
+  goterm_results_B3[[i]] <- hyperGTest(test_object_B3)
+  }
+
+
+```
+
+Below, the GO term enrichment analysis results are summarized in a heatmap. !! The NAs in the dataset are replaced with 0. 
+
+```{r visual goterms B3, echo=FALSE, fig.width=5, fig.height=7}
+summary_B3_GO <- list()
+for (i in 1:5) {
+   goterm_analysis_results_B3 <- summary(goterm_results_B3[[i]])
+   # filter for counts >5 and < 500?
+    goterm_analysis_results_B3 <- goterm_analysis_results_B3 %>% 
+    filter(Count > 5) %>% 
+    filter(Count < 500)
+   
+   # adjust p-values for multple testing
+   goterm_analysis_results_B3$padj <- p.adjust(goterm_analysis_results_B3$Pvalue, 
+                                              method = "BH")
+   summary_B3_GO[[i]] <- goterm_analysis_results_B3 %>% as.data.frame()
+}
+
+summary_B3_GO_df <- c(summary_B3_GO[[1]]$Term, 
+                      summary_B3_GO[[2]]$Term, 
+                      summary_B3_GO[[3]]$Term, 
+                      summary_B3_GO[[4]]$Term, 
+                      summary_B3_GO[[5]]$Term) %>% as.data.frame()
+summary_B3_GO_df <- unique(summary_B3_GO_df)
+rownames(summary_B3_GO_df) <- summary_B3_GO_df$.
+
+summary_B3_GO_df$cluster_1 <- summary_B3_GO[[1]]$padj[match(summary_B3_GO_df$., 
+                                                             summary_B3_GO[[1]]$Term)]
+summary_B3_GO_df$cluster_2 <- summary_B3_GO[[2]]$padj[match(summary_B3_GO_df$.,
+                                                             summary_B3_GO[[2]]$Term)]
+summary_B3_GO_df$cluster_3 <- summary_B3_GO[[3]]$padj[match(summary_B3_GO_df$.,
+                                                             summary_B3_GO[[3]]$Term)]
+summary_B3_GO_df$cluster_4 <- summary_B3_GO[[4]]$padj[match(summary_B3_GO_df$.,
+                                                             summary_B3_GO[[4]]$Term)]
+summary_B3_GO_df$cluster_5 <- summary_B3_GO[[5]]$padj[match(summary_B3_GO_df$.,
+                                                             summary_B3_GO[[5]]$Term)]
+
+
+
+
+# replace all NAs by 0
+summary_B3_GO_df[is.na(summary_B3_GO_df)] <- 0
+summary_B3_GO_df <- summary_B3_GO_df[, -1]
+# remove all rows with 0 in all columns
+
+
+
+```
+
+
+```{r merged datasets, echo=FALSE}
+# merge heatmaps for B3 and A2
+merged_genes <- merge(unique_genes_A2, unique_genes_B3, by = "row.names")
+rownames(merged_genes) <- merged_genes$Row.names
+merged_genes <- merged_genes[, -c(1, 2, 7)]
+```
+
+
+
+To visualize the gene expression of significant genes over time in the A2 infected cells, a heatmap is shown below. here, red shows upregulation and blue shows downregulation. The genes are clustered by hierarchical clustering.
+
+```{r heatmap merge, echo=FALSE, fig.width=5, fig.height=7}
+pheatmap_merged <- pheatmap(merged_genes, 
+                        scale = "row", 
+                        gaps_col = 4,
+                        show_rownames = FALSE, 
+                        cluster_rows = TRUE, 
+                        cluster_cols = FALSE, 
+                        fontsize = 5,
+                        main = "Heatmap for gene expression as a function of time")
+
+
+```
+To determine clustering sizes, the dendrogram extracted from the heatmap is shown below. 
+```{r dendrogram merged, echo=FALSE, fig.width=5, fig.height=5}
+
+plot(pheatmap_merged$tree_row, 
+     main = "Dendrogram for A2 virus infected neurons")
+     
+
+
+```
+
+
+
+```{r clusters merged, echo=FALSE, fig.width=4, fig.height=3}
+
+#extract clusters 
+clusters <- cbind(merged_genes,
+                     cluster = cutree(pheatmap_merged$tree_row,
+                                      k = 5))
+
+clusters_list <- list()
+
+# find genes in each cluster with a loop
+for (i in 1:5) {
+  assign(paste0("cluster_", i), clusters[clusters$cluster == i, ])
+  clusters_list[[i]] <- get(paste0("cluster_", i))
+}
+
+
+
+
+```
+
+From the previous heatmap, 9 clusters were extracted. The following graphs show the relative gene expression for each cluster as a function of time. 
+
+```{r clustergraphs merged, echo=FALSE, fig.width=4, fig.height=3}
+# Create a list to store the long-format data frames
+long_format_clusters <- list()
+
+# Loop through each cluster
+for (i in 1:5) {
+  # Subset the data for the current cluster
+  current_cluster <- get(paste0("cluster_", i))
+  current_cluster <- as.data.frame(current_cluster)
+
+  # Calculate the mean expression for the current cluster
+  cluster_mean_A2 <- rowMeans(current_cluster[, 1:4])
+  cluster_stdev_A2 <- apply(current_cluster[, 1:4], 1, sd)
+  
+  current_cluster_A2 <- current_cluster[, 1:4]
+
+  # Calculate relative gene expression by subtracting the cluster mean
+  current_cluster_A2 <- (current_cluster_A2 - cluster_mean_A2) / cluster_stdev_A2
+  #current_cluster_A2 <- sapply(current_cluster_A2, 
+                                   #function(x) ifelse(x < -3, -3, 
+                                                      #ifelse(x > 3, 3, x)))
+  
+  colnames(current_cluster_A2) <- c("mock", "24h", "48h", "72h")
+
+  # Convert the current cluster to long format
+  current_cluster_long_A2 <- tidyr::pivot_longer(current_cluster_A2, 
+    cols = c("mock", "24h", "48h", "72h"),
+    names_to = "timepoint", values_to = "relative_expression"
+  )
+  
+  # Add a column to store gene names
+  current_cluster_long_A2$gene <- rep(rownames(current_cluster_A2), each = 4) # Repeat each gene name for the 4 timepoints
+  
+  # Reorder the levels of the "timepoint" factor to have "mock" first
+  current_cluster_long_A2$timepoint <- factor(current_cluster_long_A2$timepoint, levels = c("mock", "24h", "48h", "72h"))
+
+  # Create a ggplot for the current cluster
+  plot_A2 <- ggplot(current_cluster_long_A2, aes(x = timepoint,
+                                           y = relative_expression,
+                                           group = gene,
+                                           color = gene)) +
+    geom_point() +
+    geom_line() +
+    labs(title = paste0("A2 Cluster ", i)) +
+    labs(x = "Timepoint", y = "z-score") +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+    )
+
+  # Show the plot
+  print(plot_A2)
+  
+  cluster_mean_B3 <- rowMeans(current_cluster[, 5:8])
+  cluster_stdev_B3 <- apply(current_cluster[, 5:8], 1, sd)
+  
+  current_cluster_B3 <- current_cluster[, 5:8]
+  
+  # Calculate relative gene expression by subtracting the cluster mean
+  current_cluster_B3 <- (current_cluster_B3 - cluster_mean_B3) / cluster_stdev_B3
+  #current_cluster_B3 <- sapply(current_cluster_B3, 
+                                   #function(x) ifelse(x < -3, -3, 
+                                                     # ifelse(x > 3, 3, x)))
+  
+  colnames(current_cluster_B3) <- c("mock", "24h", "48h", "72h")
+  
+  # Convert the current cluster to long format
+  current_cluster_long_B3 <- tidyr::pivot_longer(current_cluster_B3, 
+    cols = c("mock", "24h", "48h", "72h"),
+    names_to = "timepoint", values_to = "relative_expression"
+  )
+  
+  # Add a column to store gene names
+  current_cluster_long_B3$gene <- rep(rownames(current_cluster_B3), each = 4) # Repeat each gene name for the 4 timepoints
+  
+  # Reorder the levels of the "timepoint" factor to have "mock" first
+  current_cluster_long_B3$timepoint <- factor(current_cluster_long_B3$timepoint, levels = c("mock", "24h", "48h", "72h"))
+  
+  # Create a ggplot for the current cluster
+  plot_B3 <- ggplot(current_cluster_long_B3, aes(x = timepoint,
+                                              y = relative_expression,
+                                              group = gene,
+                                              color = gene)) +
+    geom_point() +
+    geom_line() +
+    labs(title = paste0("B3 Cluster ", i)) +
+    labs(x = "Timepoint", y = "z-score") +
+    theme_minimal() +
+    theme(
+      legend.position = "none"
+    )
+  
+  # Show the plot
+  print(plot_B3)
+}
+
+
+```
+
+
+For every cluster, GO term enrichment analysis is performed and visualized in the graphs below. 
+```{r GO term enrichment merged, include=FALSE}
+
+# create list to store go term analysis results
+goterm_results <- list()
+
+# go term enrichment analysis for every cluster in the cluster list
+for (i in 1:5) {
+  # object with names of all significant genes
+  sign_genes <- rownames(clusters_list[[i]])
+  
+  # convert gene IDs to Entrez IDs
+  sign_genes <- mapIds(org.Hs.eg.db, 
+                          keys = sign_genes,
+                          column = "ENTREZID", 
+                          keytype = "SYMBOL")
+  
+
+  # Perform GO term enrichment analysis
+  test_object <- new("GOHyperGParams",
+                        geneIds = sign_genes,
+                        universeGeneIds = all_genes, 
+                        annotation = "org.Hs.eg.db", 
+                        ontology = "BP", 
+                        pvalueCutoff = 1,
+                        testDirection = "over")
+  
+  # save current results in the list
+  goterm_results[[i]] <- hyperGTest(test_object)
+  }
+
+```
+
+The genes in A2 clusters:
+```{r genes in clusters merged, echo=FALSE}
+# create list to store gene names for every cluster
+genes_in_clusters <- list()
+
+# loop through every cluster
+for (i in 1:5) {
+  # extract gene names for current cluster
+  genes_in_clusters[[i]] <- rownames(clusters_list[[i]])
+}
+
+# save lists
+# write the significant genes to a file
+for (i in 1:length(genes_in_clusters)) {
+  write.table(genes_in_clusters[[i]], file = paste("data/clusters_", i, ".txt", sep = ""), sep = "\t")
+}
+
+print(genes_in_clusters)
+
+```
+
+
+
+```{r visual goterms merged, include=FALSE, fig.width=5, fig.height=7}
+summary_GO <- list()
+for (i in 1:5) {
+   goterm_analysis_results <- summary(goterm_results[[i]])
+   # filter for counts >5 and < 500?
+    goterm_analysis_results <- goterm_analysis_results %>% 
+    filter(Count > 5) %>% 
+    filter(Count < 500)
+   
+   # adjust p-values for multple testing
+   goterm_analysis_results$padj <- p.adjust(goterm_analysis_results$Pvalue, 
+                                              method = "BH")
+   summary_GO[[i]] <- goterm_analysis_results %>% as.data.frame()
+}
+
+summary_GO_df <- c(summary_GO[[1]]$Term,
+                   summary_GO[[2]]$Term,
+                   summary_GO[[3]]$Term,
+                   summary_GO[[4]]$Term,
+                   summary_GO[[5]]$Term) %>% as.data.frame()
+
+summary_GO_df <- unique(summary_GO_df)
+
+rownames(summary_GO_df) <- summary_GO_df$.
+
+summary_GO_df$cluster_1 <- summary_GO[[1]]$padj[match(summary_GO_df$., 
+                                                             summary_GO[[1]]$Term)]
+summary_GO_df$cluster_2 <- summary_GO[[2]]$padj[match(summary_GO_df$.,
+                                                             summary_GO[[2]]$Term)]
+summary_GO_df$cluster_3 <- summary_GO[[3]]$padj[match(summary_GO_df$.,
+                                                             summary_GO[[3]]$Term)]
+summary_GO_df$cluster_4 <- summary_GO[[4]]$padj[match(summary_GO_df$.,
+                                                             summary_GO[[4]]$Term)]
+summary_GO_df$cluster_5 <- summary_GO[[5]]$padj[match(summary_GO_df$.,
+                                                             summary_GO[[5]]$Term)]
+
+                      
+
+
+# replace all NAs by 0
+summary_GO_df[is.na(summary_GO_df)] <- 0
+summary_GO_df <- summary_GO_df[, -1]
+# remove all rows with 0 in all columns
+summary_GO_df <- summary_GO_df[apply(summary_GO_df, 1, function(x) !all(x == 0)), ]
+```
+
+
+```{r visual goterms graphs, echo=FALSE, fig.width=7, fig.height=5}
+
+visualize_GO_enrichment <- function(goterm_results, title_prefix, save_path = NULL) {
+  summary <- summary(goterm_results)
+  summary <- summary %>% filter(Count > 5) %>% filter(Count < 500)
+  
+  summary$padj <- p.adjust(summary$Pvalue, method = "BH")
+  
+  # Select the top 20 GO terms
+  goterm_top20 <- summary[order(summary$padj)[1:20],]
+
+  # Plot the p-values of the top 20 GO terms
+  goterm_top20$Term <- factor(goterm_top20$Term, 
+                              levels = goterm_top20$Term[order(goterm_top20$padj, decreasing = TRUE)])
+  
+  # Plot the visualization
+  plot_obj <- ggplot(goterm_top20, aes(x = Term, y = -log10(padj))) +
+    geom_point() +
+    coord_flip() +
+    ylab(expression(-log[10](adjusted~italic(P)~value))) + 
+    ggtitle(title_prefix) +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(),
+          axis.text.y = element_text(size = 5),
+          axis.title.x = element_text(size = 4),
+          axis.title.y = element_blank(),
+          plot.title = element_text(size = 4, face = "bold"))
+
+  # Display the plot
+  print(plot_obj)
+
+  # Save the plot if a save path is provided
+  #if (!is.null(save_path)) {
+    #ggsave(file.path("data/plots/", save_path), plot_obj, width = 12, height = 6)
+ # }
+}
+
+# Visualize results for each cluster in WT
+for (i in seq_along(goterm_results)) {
+  visualize_GO_enrichment(goterm_results[[i]], paste("GO terms Cluster", i))#,
+                          #save_path = paste("GOterms_Cluster_", i, ".png", sep = ""))
+}
+
+
+
+```
+```{r virus genome coverage A2, eval=FALSE, include=FALSE}
+library(Gviz)
+library(rtracklayer)
+
+# Load your BAM files for different timepoints
+bamfile_mock_1 <- import("data/export/mock_1_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_mock_2 <- import("data/export/mock_2_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_mock_3 <- import("data/export/mock_3_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_24_1 <- import("data/export/24_A2_1_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_24_2 <- import("data/export/24_A2_2_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_24_3 <- import("data/export/24_A2_3_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_48_1 <- import("data/export/48_A2_1_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_48_2 <- import("data/export/48_A2_2_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_48_3 <- import("data/export/48_A2_3_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_72_1 <- import("data/export/72_A2_1_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_72_2 <- import("data/export/72_A2_2_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+bamfile_72_3 <- import("data/export/72_A2_3_1Aligned.out.unmapped.fastq_mapped_sorted.bam")
+
+# Create a GenomeAxisTrack for the x-axis
+genomeTrack <- import("EVD68_A2andB3.fasta")
+
+# Create AlignmentsTrack for each timepoint
+readsTrack_mock_1 <- AlignmentsTrack(bamfile_mock_1, genome = genomeTrack, type = "histogram", name = "Mock 1")
+readsTrack_mock_2 <- AlignmentsTrack(bamfile_mock_2, genome = genomeTrack, type = "histogram", name = "Mock 2")
+readsTrack_mock_3 <- AlignmentsTrack(bamfile_mock_3, genome = genomeTrack, type = "histogram", name = "Mock 3")
+readsTrack_24_1 <- AlignmentsTrack(bamfile_24_1, genome = genomeTrack, type = "histogram", name = "24h 1")
+readsTrack_24_2 <- AlignmentsTrack(bamfile_24_2, genome = genomeTrack, type = "histogram", name = "24h 2")
+readsTrack_24_3 <- AlignmentsTrack(bamfile_24_3, genome = genomeTrack, type = "histogram", name = "24h 3")
+readsTrack_48_1 <- AlignmentsTrack(bamfile_48_1, genome = genomeTrack, type = "histogram", name = "48h 1")
+readsTrack_48_2 <- AlignmentsTrack(bamfile_48_2, genome = genomeTrack, type = "histogram", name = "48h 2")
+readsTrack_48_3 <- AlignmentsTrack(bamfile_48_3, genome = genomeTrack, type = "histogram", name = "48h 3")
+readsTrack_72_1 <- AlignmentsTrack(bamfile_72_1, genome = genomeTrack, type = "histogram", name = "72h 1")
+readsTrack_72_2 <- AlignmentsTrack(bamfile_72_2, genome = genomeTrack, type = "histogram", name = "72h 2")
+readsTrack_72_3 <- AlignmentsTrack(bamfile_72_3, genome = genomeTrack, type = "histogram", name = "72h 3")
+
+AlignmentsTrack()
+
+# Create a GenomePlot with multiple tracks
+plotTracks(
+  list(
+    genomeTrack,
+    readsTrack_mock_1,
+    readsTrack_mock_2,
+    readsTrack_mock_3,
+    readsTrack_24_1,
+    readsTrack_24_2,
+    readsTrack_24_3,
+    readsTrack_48_1,
+    readsTrack_48_2,
+    readsTrack_48_3,
+    readsTrack_72_1,
+    readsTrack_72_2,
+    readsTrack_72_3
+  ),
+  from = 1,
+  to = 10000
+)
+
+# Show the plot
+showPlot()
+
+
+```
+
+
