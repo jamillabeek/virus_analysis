@@ -157,12 +157,15 @@ for (i in 1:length(results_list)) {
   sig_genes_list[[i]] <- results_list[[i]][!is.na(results_list[[i]]$padj) & results_list[[i]]$padj < 0.05, ]
 }
 
+names(sig_genes_list) <- names(results_list)
 ```
+
 
 ```{r significant genes write, echo=FALSE}
 # write the significant genes to a file
+
 for (i in 1:length(sig_genes_list)) {
-  write.table(sig_genes_list[[i]], file = paste("data/sig_genes_dataset", names(sig_genes_list[i]), ".txt", sep = ""), sep = "\t")
+  write.table(sig_genes_list[[i]], file = paste("data/", names(sig_genes_list)[i], "_sig_genes.txt", sep = ""), sep = "\t")
 }
 
 ```
@@ -207,6 +210,9 @@ print(p)
 ```
 
 ```{r make dataset with normalized counts for DEGs, echo=FALSE}
+
+
+######## probably not needed to mention the thresholds twice??
 process_results <- function(results, padj_threshold = 0.01, log2fc_threshold = 1.5) {
   results <- results[!is.na(results$padj) &
                      results$padj < padj_threshold &
@@ -907,11 +913,13 @@ for (i in 1:length(clusters_list)) {
 # write the significant genes to a file
 for (i in 1:length(genes_in_clusters)) {
   as.data.frame(genes_in_clusters[[i]])
-  file_name <- paste("data/clusters_",i,".txt")
+  file_name <- paste("data/clusters_",i,".txt", sep = "")
   lapply(genes_in_clusters[[i]], write, file = file_name, append=TRUE)
 }
 
 print(genes_in_clusters)
+
+
 
 ```
 
