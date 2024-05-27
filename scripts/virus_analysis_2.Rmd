@@ -25,11 +25,7 @@ library(GOstats)
 library(reshape2)
 library(VennDiagram)
 library(ggvenn)
-library(clusterProfiler)
-library(AnnotationDbi)
-library(enrichplot)
 
-library(readr)
 ```
 
 

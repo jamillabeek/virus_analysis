@@ -281,6 +281,17 @@ ggsave("data/plots/virus_mutations.svg", width = 10, height = 6, dpi = 300)
 
 ```
 
+```{r print mutations df, echo=FALSE}
+
+mutations_df <- mut_data[, c(1, 2, 3, 4, 14, 16, 18, 20, 6, 8, 10, 12)]
+
+# exclude lines where reads_all is equal to matches
+mutations_df <- mutations_df[mutations_df$reads_all != mutations_df$matches,]
+write.table(mutations_df, "data/mutations_df.tsv", sep = "\t", quote = FALSE, row.names = FALSE)
+
+
+```
+
 ```{r combined plot, echo=FALSE}
 
 # replcae in total readcounts in the rownames "coverage" for "mutations"
