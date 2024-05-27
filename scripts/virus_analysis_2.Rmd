@@ -11,7 +11,7 @@ knitr::opts_knit$set(root.dir = "C:\\Users\\jamil\\OneDrive\\Documenten\\LUMC\\v
 
 ```
 
-```{r load packages and data, include=FALSE}
+```{r load packages, include=FALSE}
 library(DESeq2)
 library(dplyr)
 library(knitr)
@@ -26,12 +26,15 @@ library(reshape2)
 library(VennDiagram)
 library(ggvenn)
 
+```
 
+
+```{r load data, include=FALSE}
 counts <- read.table("data/exp2.counts", header = TRUE)
 counts <- as.data.frame(counts)
 
 gene_info <- counts[, 1:6]
-counts <- counts[, 7:29]
+counts <- counts[, 7:30]
 counts$Geneid <- gene_info$Geneid
 rownames(counts) <- counts$Geneid
 counts <- subset(counts, select = -Geneid)
@@ -62,22 +65,22 @@ pseudocount <- 1 # adjust as needed
 counts_with_pseudocount <- filtered_counts + pseudocount
 
 # copy the columns 1:3 and 19:23 to a new matrix
-counts_with_pseudocount_24_A2 <- counts_with_pseudocount[, c(1:3, 21:23)]
-counts_with_pseudocount_48_A2 <- counts_with_pseudocount[, c(7:9, 21:23)]
-counts_with_pseudocount_72_A2 <- counts_with_pseudocount[, c(13:15, 21:23)]
-counts_with_pseudocount_24_B3 <- counts_with_pseudocount[, c(4:6, 21:23)]
-counts_with_pseudocount_48_B3 <- counts_with_pseudocount[, c(10:12, 21:23)]
-counts_with_pseudocount_72_B3 <- counts_with_pseudocount[, c(16:18, 21:23)]
-counts_with_pseudocounts_IFNB <- counts_with_pseudocount[, c(19:23)]
+counts_with_pseudocount_24_A2 <- counts_with_pseudocount[, c(1:3, 22:24)]
+counts_with_pseudocount_48_A2 <- counts_with_pseudocount[, c(7:9, 22:24)]
+counts_with_pseudocount_72_A2 <- counts_with_pseudocount[, c(13:15, 22:24)]
+counts_with_pseudocount_24_B3 <- counts_with_pseudocount[, c(4:6, 22:24)]
+counts_with_pseudocount_48_B3 <- counts_with_pseudocount[, c(10:12, 22:24)]
+counts_with_pseudocount_72_B3 <- counts_with_pseudocount[, c(16:18, 22:24)]
+counts_with_pseudocounts_IFNB <- counts_with_pseudocount[, c(19:24)]
 
 # do same for metadata
-metadata_24_A2 <- metadata[c(1:3, 21:23), ]
-metadata_48_A2 <- metadata[c(7:9, 21:23), ]
-metadata_72_A2 <- metadata[c(13:15, 21:23), ]
-metadata_24_B3 <- metadata[c(4:6, 21:23), ]
-metadata_48_B3 <- metadata[c(10:12, 21:23), ]
-metadata_72_B3 <- metadata[c(16:18, 21:23), ]
-metadata_INFB <- metadata[c(19:23), ]
+metadata_24_A2 <- metadata[c(1:3, 22:24), ]
+metadata_48_A2 <- metadata[c(7:9, 22:24), ]
+metadata_72_A2 <- metadata[c(13:15, 22:24), ]
+metadata_24_B3 <- metadata[c(4:6, 22:24), ]
+metadata_48_B3 <- metadata[c(10:12, 22:24), ]
+metadata_72_B3 <- metadata[c(16:18, 22:24), ]
+metadata_IFNB <- metadata[c(19:24), ]
 
 # create a list with the datasets and metadata
 datasets <- list(counts_with_pseudocount_24_A2, 
@@ -93,7 +96,7 @@ metadata_list <- list(metadata_24_A2,
                       metadata_24_B3, 
                       metadata_48_B3, 
                       metadata_72_B3, 
-                      metadata_INFB)
+                      metadata_IFNB)
 # add names to the list
 names(datasets) <- c("Condition_A2_Time_24", "Condition_A2_Time_48", "Condition_A2_Time_72", "Condition_B3_Time_24", "Condition_B3_Time_48", "Condition_B3_Time_72", "Condition_IFNB")
 
@@ -157,17 +160,20 @@ for (i in 1:length(results_list)) {
   sig_genes_list[[i]] <- results_list[[i]][!is.na(results_list[[i]]$padj) & results_list[[i]]$padj < 0.05, ]
 }
 
+names(sig_genes_list) <- names(results_list)
 ```
+
 
 ```{r significant genes write, echo=FALSE}
 # write the significant genes to a file
+
 for (i in 1:length(sig_genes_list)) {
-  write.table(sig_genes_list[[i]], file = paste("data/sig_genes_dataset", names(sig_genes_list[i]), ".txt", sep = ""), sep = "\t")
+  write.table(sig_genes_list[[i]], file = paste("data/", names(sig_genes_list)[i], "_sig_genes.txt", sep = ""), sep = "\t")
 }
 
 ```
 
-# Differential gene expression analysis results for INFB vs mock are plotted below. The plot shows the log2FoldChange vs baseMean for each gene. The genes that are most upregulated in the INFB condition are labelled. The genes are also colored in a scale for p-value. 
+# Differential gene expression analysis results for IFNB vs mock are plotted below. The plot shows the log2FoldChange vs baseMean for each gene. The genes that are most upregulated in the IFNB condition are labelled. The genes are also colored in a scale for p-value. 
 ```{r logFC vs base mean, echo=FALSE, fig.width=7, fig.height=7, message=FALSE, warning=FALSE}
 # load data
 
@@ -183,7 +189,7 @@ p <- ggplot(results) +
   geom_point(aes(x = log2FoldChange, y = log2(baseMean), color = results$padj), size = 1) +
   labs(x = "log2FoldChange", y = "baseMean") + 
   labs(color = "Adjusted p-value: ") + 
-  ggtitle("log2FoldChange vs baseMean in mock vs INFB") +
+  ggtitle("log2FoldChange vs baseMean in mock vs IFNB") +
   theme(
     legend.key.width = unit(1, "cm"),  
     legend.key.height = unit(0.5, "cm"),  
@@ -206,7 +212,54 @@ print(p)
 
 ```
 
+## Volcanoplot for A2-48 and B3-24: 
+
+```{r DGE A248 and B324, echo=FALSE, warning=FALSE, message=FALSE}
+df_A2_48_B3_24 <- counts[, c(7:9, 4:6)]
+meta_A2_48_B3_24 <- metadata[c(7:9, 4:6), ]
+
+dds_A2_48_B3_24 <- DESeqDataSetFromMatrix(countData = df_A2_48_B3_24,
+                              colData = meta_A2_48_B3_24,
+                              design = ~ condition)
+
+dds_A2_48_B3_24 <- DESeq(dds_A2_48_B3_24)
+
+res_A2_48_B3_24 <- results(dds_A2_48_B3_24)
+
+# Specify genes to label
+genes_to_label <- c(rownames(head(res_A2_48_B3_24[order(res_A2_48_B3_24$log2FoldChange),], 5)))
+
+# Create the plot
+p <- ggplot(res_A2_48_B3_24) +
+  geom_point(aes(x = log2FoldChange, y = log2(baseMean), color = res_A2_48_B3_24$padj), size = 1) +
+  labs(x = "log2FoldChange", y = "baseMean") + 
+  labs(color = "Adjusted p-value: ") + 
+  ggtitle("log2FoldChange vs baseMean in A2_48 vs B3_24") +
+  theme(
+    legend.key.width = unit(1, "cm"),  
+    legend.key.height = unit(0.5, "cm"),  
+    legend.text = element_text(size = 4),  
+    legend.title = element_text(size = 5),
+    plot.caption = element_text(hjust = 0)  # Adjust the caption position
+  ) 
+
+
+print(p)
+```
+
+##Genes significantly differentially expressed in A2-48 vs B3-24:
+
+```{r DGE A2-48 and B3-24, echo=FALSE}
+# subset significant genes in A2_48 vs B3_24
+sig_A2_48_B3_24 <- subset(res_A2_48_B3_24, padj < 0.05)
+rownames(sig_A2_48_B3_24)
+
+
+```
 ```{r make dataset with normalized counts for DEGs, echo=FALSE}
+
+
+######## probably not needed to mention the thresholds twice??
 process_results <- function(results, padj_threshold = 0.01, log2fc_threshold = 1.5) {
   results <- results[!is.na(results$padj) &
                      results$padj < padj_threshold &
@@ -241,7 +294,7 @@ counts_A2_72 <- counts(datasets$Condition_A2_Time_72, normalized = TRUE)
 counts_B3_24 <- counts(datasets$Condition_B3_Time_24, normalized = TRUE)
 counts_B3_48 <- counts(datasets$Condition_B3_Time_48, normalized = TRUE)
 counts_B3_72 <- counts(datasets$Condition_B3_Time_72, normalized = TRUE)
-counts_infb <- counts(datasets$Condition_IFNB, normalized = TRUE)
+counts_IFNB <- counts(datasets$Condition_IFNB, normalized = TRUE)
 
 # calculate mean for mock and A3
 mock <- rowMeans(counts_A2_24[, 4:6])
@@ -272,9 +325,15 @@ B3_72 <- rowMeans(counts_B3_72[, 1:3])
 B3_72 <- as.data.frame(B3_72)
 colnames(B3_72) <- "72"
 
-# create table with genes as rows, mean counts as cols: mock, 24, 48, 72
+IFNB <- rowMeans(counts_IFNB[, 1:3])
+IFNB <- as.data.frame(IFNB)
+colnames(IFNB) <- "IFNB"
+
+# create table with genes as rows, mean counts as cols: mock, 24, 48, 72, INFB
 unique_genes$mock <- mock$mock[match(unique_genes$.,
                                                           rownames(A2_24))]
+unique_genes$"IFNB" <- IFNB$"IFNB"[match(unique_genes$.,
+                                                          rownames(IFNB))]
 unique_genes$"A2_24h" <- A2_24$"24"[match(unique_genes$.,
                                                           rownames(A2_24))]
 unique_genes$"A2_48h" <- A2_48$"48"[match(unique_genes$.,
@@ -287,6 +346,7 @@ unique_genes$"B3_48h" <- B3_48$"48"[match(unique_genes$.,
                                                           rownames(B3_48))]
 unique_genes$"B3_72h" <- B3_72$"72"[match(unique_genes$.,
                                                           rownames(B3_72))]
+
 
 rownames(unique_genes) <- unique_genes$.
 unique_genes <- unique_genes[, -1]
@@ -355,15 +415,30 @@ combined_long <- melt(combined, id.vars = c("time", "regulation"))
 
 combined_long$regulation <- factor(combined_long$regulation, levels = c("up", "down"))
 
-ggplot(combined_long, aes(x = variable, y = value, fill = regulation)) +
-  geom_bar(stat = "identity", position = "stack") +
+barchart <- ggplot(combined_long, aes(x = variable, y = value, fill = regulation)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
   labs(
     title = "Number of differentially expressed genes",
     x = "Time and Virus", y = "Count", fill = "Regulation") +
   scale_fill_manual(values = c("down" = "cornflowerblue", "up" = "indianred2")) +
+  facet_wrap(~time) + 
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~time)  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.key.width = unit(0.5, "cm"),  
+        legend.key.height = unit(0.3, "cm"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 12),
+        panel.border = element_blank()) + 
+  theme(axis.line = element_line(color = "black")) 
+
+print(barchart)
+ggsave("data/plots/barchart.svg", barchart, bg = "transparent")
 #  theme(panel.margin = grid::unit(1.25, "lines"))
 
 # same plot but with percentage
@@ -372,18 +447,36 @@ combined_fraction <- rbind(cbind(fractions_24, time = "24h"), cbind(fractions_48
 combined_fraction_long <- melt(combined_fraction, id.vars = c("time", "regulation"))
 
 # add actual counts to bars
-# should the A2 an B3 bars only include unique genes or all signiifcant genes?
+# should the A2 an B3 bars only include unique genes or all significant genes?
 combined_fraction_long$regulation <- factor(combined_fraction_long$regulation, levels = c("up", "down"))
 
-ggplot(combined_fraction_long, aes(x = variable, y = value, fill = regulation)) +
-  geom_bar(stat = "identity", position = "stack") +
+barchart_percentage <- ggplot(combined_fraction_long, aes(x = variable, y = value, fill = regulation)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
   labs(
     title = "Percentage of up- or downregulated genes per timepoint in A2 and B3",
     x = "Time and Virus", y = "Percentage", fill = "Regulation") +
   scale_fill_manual(values = c("down" = "cornflowerblue", "up" = "indianred2")) +
-  theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~time)
+  facet_wrap(~time) + 
+    theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.key.width = unit(0.5, "cm"),  
+        legend.key.height = unit(0.3, "cm"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 12),
+        panel.border = element_blank()) + 
+  theme(axis.line = element_line(color = "black")) 
+
+print(barchart_percentage)
+ggsave("data/plots/barchart_percentage.svg", barchart_percentage, bg = "transparent") 
+
+
 
 ```
 
@@ -424,7 +517,7 @@ venn_down_B3 + ggtitle("Downregulated genes in B3")
 upregulated_A2 <- venn.diagram(
   x = list(Set1 = rownames(up_A2), Set2 = rownames(up_A2_1), Set3 = rownames(up_A2_2)),
   category.names = c("24H", "48H", "72H"),
-  filename = "data/upregulated_A2.png",
+  filename = "data/upregulated_A2.svg",
   pattern = 'Venn_3set_pretty',
   col = "transparent",
   fill = c("cornflowerblue", "indianred2", "palegreen3"))
@@ -433,7 +526,7 @@ upregulated_A2 <- venn.diagram(
 downregulated_A2 <- venn.diagram(
   x = list(Set1 = rownames(down_A2), Set2 = rownames(down_A2_1), Set3 = rownames(down_A2_2)),
   category.names = c("24H", "48H", "72H"),
-  filename = "data/downregulated_A2.png",
+  filename = "data/downregulated_A2.svg",
   pattern = 'Venn_3set_pretty',
   col = "transparent",
   fill = c("cornflowerblue", "indianred2", "palegreen3"))
@@ -442,7 +535,7 @@ downregulated_A2 <- venn.diagram(
 upregulated_B3 <- venn.diagram(
   x = list(Set1 = rownames(up_B3), Set2 = rownames(up_B3_1), Set3 = rownames(up_B3_2)),
   category.names = c("24H", "48H", "72H"),
-  filename = "data/upregulated_B3.png",
+  filename = "data/upregulated_B3.svg",
   pattern = 'Venn_3set_pretty',
   col = "transparent",
   fill = c("cornflowerblue", "indianred2", "palegreen3"))
@@ -452,7 +545,7 @@ upregulated_B3 <- venn.diagram(
 downregulated_B3 <- venn.diagram(
   x = list(Set1 = rownames(down_B3), Set2 = rownames(down_B3_1), Set3 = rownames(down_B3_2)),
   category.names = c("24H", "48H", "72H"),
-  filename = "data/downregulated_B3.png",
+  filename = "data/downregulated_B3.svg",
   pattern = 'Venn_3set_pretty',
 col = "transparent",
 fill = c("cornflowerblue", "indianred2", "palegreen3"))
@@ -515,7 +608,7 @@ comp_var <- ggplot(pca_summary_long) +
   ylab(paste0("Proportion of Variance")) +
   theme_minimal()
 
-ggsave("data/plots/pca_comp_var.png", comp_var, width = 7, height = 5, units = "in", dpi = 300)
+ggsave("data/plots/pca_comp_var.svg", comp_var, width = 7, height = 5, units = "in", dpi = 300)
 
 print(comp_var)
 
@@ -534,22 +627,31 @@ pca_plotting$time[pca_plotting$time == 72] <- "72H"
 pca_plotting$time <- as.factor(pca_plotting$time)
 
 
-# Plot PC1 vs PC2
+
 PC12 <- ggplot(pca_plotting) + 
   geom_point(aes(x=PC1, y=PC2, color = condition, shape = time), size = 3) +
   ggtitle("PC1 vs PC2 shifts of virus infected neurons across time") +
   xlab(paste0("PC1 (", PC1_var, "%)")) +
   ylab(paste0("PC2 (", PC2_var, "%)")) +
-  theme_classic() +
-  theme(legend.key.width = unit(0.5, "cm"),  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.key.width = unit(0.5, "cm"),  
         legend.key.height = unit(0.3, "cm"),  
         legend.text = element_text(size = 10),  
-        legend.title = element_text(size = 12)) + 
+        legend.title = element_text(size = 12),
+        panel.border = element_blank()) + 
+  theme(axis.line = element_line(color = "black")) +  # Add axis lines
   labs(color = "Condition", shape = "Time")
 
-
 print(PC12)
-ggsave("data/plots/pca_PC1_PC2.png", PC12)
+ggsave("data/plots/pca_PC1_PC2.svg", PC12, bg = "transparent")
+
 
 
 PC13 <- ggplot(pca_plotting) + 
@@ -604,15 +706,24 @@ pca_coef_plot <- ggplot(pca_coef) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "darkgrey", size = 0.5) +
   xlab(paste0("PC1")) +
   ylab(paste0("PC2")) +
-  theme_classic() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.text = element_text(size = 8),
+        legend.position = "right") + 
+  theme(axis.line = element_line(color = "black")) +  # Add axis lines
   geom_text_repel(data = subset(pca_coef, gene %in% labeled_genes),
                   aes(x = PC1, y = PC2, label = gene),
-                  color = "black") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.text = element_text(size = 8),
-        legend.position = "right")
+                  color = "black")
 
 print(pca_coef_plot)
+ggsave("data/plots/pca_coef_plot.svg", pca_coef_plot)
 
 ```
 
@@ -628,7 +739,7 @@ colnames(counts_normalized) <- c("A2_24H_1", "A2_24H_2", "A2_24H_3",
                                  "B3_24H_1", "B3_24H_2", "B3_24H_3", 
                                  "B3_48H_1", "B3_48H_2", "B3_48H_3",
                                  "B3_72H_1", "B3_72H_2", "B3_72H_3",
-                                 "INFB_24H_2", "INFB_24H_3",
+                                 "IFNB_24H_1","IFNB_24H_2", "IFNB_24H_3",
                                  "mock_24H_1", "mock_24H_2", "mock_24H_3")
 # Then, filter the data for the labeled genes
 labeled_genes_data <- counts_normalized[labeled_genes, ]
@@ -684,10 +795,10 @@ deseq_counts <- cbind(counts_A2_24,
                       counts_B3_24[, 1:3], 
                       counts_B3_48[, 1:3], 
                       counts_B3_72[, 1:3],
-                      counts_infb[, 1:2])
+                      counts_IFNB[, 1:3])
 
-# rearrange for mock to come first and infb last
-deseq_counts <- deseq_counts[, c(4:6, 1:3, 7:23)]
+# rearrange for mock to come first and IFNB last
+deseq_counts <- deseq_counts[, c(4:6, 1:3, 7:24)]
 
 # subset with significant gene
 # Assuming unique_genes contains the significant gene names
@@ -698,7 +809,7 @@ deseq_counts_subset <- deseq_counts[sig_genes, , drop = FALSE]
 deseq_counts_scaled <- t(scale(t(deseq_counts_subset)))
 
 # trim from the colnames 1Aligned.out.bam
-colnames(deseq_counts_scaled) <- gsub("_1Aligned.out.bam", "", colnames(deseq_counts_scaled))
+colnames(deseq_counts_scaled) <- colnames(counts_normalized)
 
 # new dataframe with for each sample group, check in the deseq dataset 
 # if p is < 0.01 and log2FoldChange > 1.5 or < -1.5
@@ -716,7 +827,7 @@ deseq_counts_summary <- data.frame(
                   abs(results_list[["Condition_B3_Time_48"]]$log2FoldChange) > 1.5, 1, 0),
   B3_72H = ifelse(results_list[["Condition_B3_Time_72"]]$padj < 0.01 & 
                   abs(results_list[["Condition_B3_Time_72"]]$log2FoldChange) > 1.5, 1, 0),
-  INFB = ifelse(results_list[["Condition_IFNB"]]$padj < 0.01 & 
+  IFNB = ifelse(results_list[["Condition_IFNB"]]$padj < 0.01 & 
                   abs(results_list[["Condition_IFNB"]]$log2FoldChange) > 1.5, 1, 0))
 
 # add rownames to the summary dataframe
@@ -725,6 +836,8 @@ rownames(deseq_counts_summary) <- rownames(results_list[["Condition_A2_Time_24"]
 deseq_counts_summary[is.na(deseq_counts_summary)] <- 0
 # subset to include only genes that are in deseq_counts_scaled
 deseq_counts_summary <- deseq_counts_summary[sig_genes, , drop = FALSE]
+
+
 
 saveRDS(deseq_counts_summary, "data/deseq_counts_summary.rds")
 saveRDS(deseq_counts_scaled, "data/deseq_counts_scaled.rds")
@@ -749,11 +862,14 @@ pheatmap <- pheatmap(unique_genes,
                         cluster_rows = TRUE, 
                         cluster_cols = FALSE, 
                         fontsize = 5,
-                     gaps_col = c(1, 4),
+                     gaps_col = c(1, 2, 5),
                         main = "Heatmap for gene expression as a function of time in virus infected neurons")
 
+ggsave("data/plots/heatmap.svg", plot = pheatmap, width = 5, height = 7, bg = "transparent")
 
 ```
+
+
 
 ```{r dendrogram, echo=FALSE, fig.width=7, fig.height=5, message=FALSE, warning=FALSE}
 
@@ -779,9 +895,6 @@ for (i in 1:3) {
   assign(paste0("cluster_", i), clusters[clusters$cluster == i, ])
   clusters_list[[i]] <- get(paste0("cluster_", i))
 }
-
-
-
 
 ```
 
@@ -834,13 +947,22 @@ for (i in 1:length(clusters_list)) {
     geom_line() +
     labs(title = paste0("A2 Cluster ", i)) +
     labs(x = "Timepoint", y = "z-score") +
-    theme_minimal() +
-    theme(
-      legend.position = "none"
-    )
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.position = "none") + 
+  theme(axis.line = element_line(color = "black"))  # Add axis lines
 
   # Show the plot
   print(plot_A2)
+  ggsave(paste0("data/plots/A2_cluster_", i, ".svg"), plot = plot_A2)
+
   
   cluster_mean_B3 <- rowMeans(current_cluster[, c(1, 5:7)])
   cluster_stdev_B3 <- apply(current_cluster[, c(1, 5:7)], 1, sd)
@@ -876,13 +998,23 @@ for (i in 1:length(clusters_list)) {
     geom_line() +
     labs(title = paste0("B3 Cluster ", i)) +
     labs(x = "Timepoint", y = "z-score") +
-    theme_minimal() +
-    theme(
-      legend.position = "none"
-    )
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+      legend.position = "none") +
+      theme(axis.line = element_line(color = "black")) # Add axis lines
+
   
   # Show the plot
   print(plot_B3)
+  ggsave(paste0("data/plots/B3_cluster_", i, ".svg"), plot = plot_B3)
+
 }
 
 
@@ -907,11 +1039,13 @@ for (i in 1:length(clusters_list)) {
 # write the significant genes to a file
 for (i in 1:length(genes_in_clusters)) {
   as.data.frame(genes_in_clusters[[i]])
-  file_name <- paste("data/clusters_",i,".txt")
+  file_name <- paste("data/plots/clusters_",i,".txt", sep = "")
   lapply(genes_in_clusters[[i]], write, file = file_name, append=TRUE)
 }
 
 print(genes_in_clusters)
+
+
 
 ```
 
@@ -981,14 +1115,22 @@ visualize_GO_enrichment <- function(goterm_results, title_prefix, save_path = NU
   # Plot the visualization
   plot_obj <- ggplot(goterm_top20, aes(x = Term, y = -log10(padj))) +
     geom_point() +
+    labs(size = expression(-log[10](adjusted~italic(P)~value)),
+         color = expression(-log[10](adjusted~italic(P)~value))) +
     coord_flip() +
     ylab(expression(-log[10](adjusted~italic(P)~value))) + 
     ggtitle(title_prefix) +
-    theme_minimal() +
-    theme(axis.text.y = element_text(size = 14),
-          axis.title.x = element_text(size = 12),
-          axis.title.y = element_blank(),
-          plot.title = element_text(size = 18, face = "bold"))
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 14, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_blank()) +
+  theme(axis.line = element_line(color = "black"))  # Add axis lines
 
   # Display the plot
   print(plot_obj)
@@ -1002,7 +1144,7 @@ visualize_GO_enrichment <- function(goterm_results, title_prefix, save_path = NU
 # Visualize results for each cluster in WT
 for (i in seq_along(goterm_results)) {
   visualize_GO_enrichment(goterm_results[[i]], paste("Cluster", i),
-                          save_path = paste("GOterms_Cluster_", i, ".png", sep = ""))
+                          save_path = paste("GOterms_Cluster_", i, ".svg", sep = ""))
 }
 
 
@@ -1010,21 +1152,83 @@ for (i in seq_along(goterm_results)) {
 
 
 ```
+```{r summarize results, echo=FALSE}
 
-# For each timepoint, differentially expressed genes are compared to INFB in Venn diagrams, the GO terms associated with each group are also shown. 
+enrich_summary <- list()
+# attempt to make pretty plots 
+
+for (i in 1:length(goterm_results)) {
+  enrich_summary[[i]] <- summary(goterm_results[[i]])
+  enrich_summary[[i]] <- enrich_summary[[i]] %>% filter(Count > 5) %>% filter(Count < 500)
+  
+  enrich_summary[[i]]$padj <- p.adjust(enrich_summary[[i]]$Pvalue, method = "BH")
+  
+  # Select the top 20 GO terms
+  goterm_top20 <- enrich_summary[[i]][order(enrich_summary[[i]]$padj)[1:20],]
+
+  # Plot the p-values of the top 20 GO terms
+  goterm_top20$Term <- factor(goterm_top20$Term, 
+                              levels = goterm_top20$Term[order(goterm_top20$padj, decreasing = TRUE)])
+  
+  # adjust p-values
+  enrich_summary[[i]]$padj <- p.adjust(enrich_summary[[i]]$Pvalue, method = "BH")
+}
+
+# filter for top5 terms
+top_terms_list <- lapply(enrich_summary, function(x) {
+  x %>% arrange(padj) %>% head(5)
+})
+
+
+# Add cluster information
+for (i in seq_along(top_terms_list)) {
+  top_terms_list[[i]]$Cluster <- paste("Cluster", i)
+}
+
+# Step 2: Combine these terms into a single data frame
+top_terms_df <- do.call(rbind, top_terms_list)
+
+top_terms_df <- top_terms_df %>%
+  separate(OddsRatio, into = c("num", "den"), sep = "/", convert = TRUE) %>%
+  mutate(OddsRatio = num / den) %>%
+  select(-num, -den)
+
+# Step 3: Create the plot
+plot <- ggplot(top_terms_df, aes(x = Cluster, y = Term, color = padj, size = OddsRatio)) +
+  geom_point() +
+  scale_color_continuous(low = "red", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 14, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_blank()) +
+  theme(axis.line = element_line(color = "black")) +
+  ggtitle("Top 5 GO Terms for Each Cluster") +
+  labs(color = "padj", size = "OddsRatio")
+
+# Print and save the plot
+print(plot)
+ggsave("data/plots/combined_enrichGO.svg", plot, width = 10, height = 7)
+
+```
+
+# For each timepoint, differentially expressed genes are compared to IFNB in Venn diagrams, the GO terms associated with each group are also shown. 
 
 ## T = 24H
 
-```{r compare INFB with virus infection t24, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
+```{r compare IFNB with virus infection t24, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
 
-# compare INFB and virus infection in venn diagram
-results_INFB <- results_list$Condition_IFNB
-upregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange < -1.5, ]
-downregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange > 1.5, ]
+# compare IFNB and virus infection in venn diagram
+results_IFNB <- results_list$Condition_IFNB
+upregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange < -1.5, ]
+downregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange > 1.5, ]
 
 downregulated_A2_24 <- results_A2[[1]][!is.na(results_A2[[1]]$padj) &
                             results_A2[[1]]$padj < 0.01 &
@@ -1043,23 +1247,25 @@ upregulated_B3_24 <- results_B3[[1]][!is.na(results_B3[[1]]$padj) &
 # plot the venn diagram with ggvenn
 venn_upregulated <- ggvenn(list("A2" = rownames(upregulated_A2_24),
                           "B3" = rownames(upregulated_B3_24),
-                          "INFB" = rownames(upregulated_INFB)), 
+                          "IFNB" = rownames(upregulated_IFNB)), 
                            fill_color = c("lightblue", "lightgreen", "lightpink"))
 
 venn_downregulated <- ggvenn(list("A2" = rownames(downregulated_A2_24),
                           "B3" = rownames(downregulated_B3_24),
-                          "INFB" = rownames(downregulated_INFB)), 
+                          "IFNB" = rownames(downregulated_IFNB)), 
                              fill_color = c("lightblue", "lightgreen", "lightpink"))
 
-venn_upregulated + ggtitle("Upregulated genes in INFB and A2, B3 (t=24) virus infection")
-venn_downregulated + ggtitle("Downregulated genes in INFB and A2, B3 (t=24) virus infection")
+venn_upregulated + ggtitle("Upregulated genes in IFNB and A2, B3 (t=24) virus infection")
+ggsave("data/plots/venn_upregulated_t24.svg")
+venn_downregulated + ggtitle("Downregulated genes in IFNB and A2, B3 (t=24) virus infection")
+ggsave("data/plots/venn_downregulated_t24.svg")
 
 list_genes <- list("A2_up" = rownames(upregulated_A2_24),
                    "A2_down" = rownames(downregulated_A2_24),
                    "B3_up" = rownames(upregulated_B3_24),
                    "B3_down" = rownames(downregulated_B3_24),
-                   "INFB_up" = rownames(upregulated_INFB),
-                   "INFB_down" = rownames(downregulated_INFB))
+                   "IFNB_up" = rownames(upregulated_IFNB),
+                   "IFNB_down" = rownames(downregulated_IFNB))
 goterm_results_24 <- list()
 
 # go term enrichment analysis for every cluster in the cluster list
@@ -1090,11 +1296,11 @@ for (i in 1:length(list_genes)) {
 # add names to the list
 names(goterm_results_24) <- names(list_genes)
 
-# GOterms at 24H post infection for A2, B3 and INFB
+# GOterms at 24H post infection for A2, B3 and IFNB
 # Visualize results for each cluster in WT
 for (i in seq_along(goterm_results_24)) {
   visualize_GO_enrichment(goterm_results_24[[i]], paste(names(goterm_results_24)[i], sep = " "),
-                          save_path = paste(i, ".png", sep = ""))
+                          save_path = paste("GOterms_t24_", names(goterm_results_24)[i], ".svg", sep = ""))
 }
 
 ```
@@ -1102,16 +1308,16 @@ for (i in seq_along(goterm_results_24)) {
 
 ## T = 48H
 
-```{r compare INFB with virus infection t48, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
+```{r compare IFNB with virus infection t48, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
 
-# compare INFB and virus infection in venn diagram
-results_INFB <- results_list$Condition_IFNB
-upregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange < -1.5, ]
-downregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange > 1.5, ]
+# compare IFNB and virus infection in venn diagram
+results_IFNB <- results_list$Condition_IFNB
+upregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange < -1.5, ]
+downregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange > 1.5, ]
 
 downregulated_A2_48 <- results_A2[[2]][!is.na(results_A2[[2]]$padj) &
                             results_A2[[2]]$padj < 0.01 &
@@ -1130,23 +1336,25 @@ upregulated_B3_48 <- results_B3[[2]][!is.na(results_B3[[2]]$padj) &
 # plot the venn diagram with ggvenn
 venn_upregulated <- ggvenn(list("A2" = rownames(upregulated_A2_48),
                           "B3" = rownames(upregulated_B3_48),
-                          "INFB" = rownames(upregulated_INFB)), 
+                          "IFNB" = rownames(upregulated_IFNB)), 
                            fill_color = c("lightblue", "lightgreen", "lightpink"))
 
 venn_downregulated <- ggvenn(list("A2" = rownames(downregulated_A2_48),
                           "B3" = rownames(downregulated_B3_48),
-                          "INFB" = rownames(downregulated_INFB)), 
+                          "IFNB" = rownames(downregulated_IFNB)), 
                              fill_color = c("lightblue", "lightgreen", "lightpink"))
 
-venn_upregulated + ggtitle("Upregulated genes in INFB and A2, B3 (t=48) virus infection")
-venn_downregulated + ggtitle("Downregulated genes in INFB and A2, B3 (t=48) virus infection ")
+venn_upregulated + ggtitle("Upregulated genes in IFNB and A2, B3 (t=48) virus infection")
+ggsave("data/plots/venn_upregulated_t48.svg")
+venn_downregulated + ggtitle("Downregulated genes in IFNB and A2, B3 (t=48) virus infection ")
+ggsave("data/plots/venn_downregulated_t48.svg")
 
 list_genes <- list("A2_up" = rownames(upregulated_A2_48),
                    "A2_down" = rownames(downregulated_A2_48),
                    "B3_up" = rownames(upregulated_B3_48),
                    "B3_down" = rownames(downregulated_B3_48),
-                   "INFB_up" = rownames(upregulated_INFB),
-                   "INFB_down" = rownames(downregulated_INFB))
+                   "IFNB_up" = rownames(upregulated_IFNB),
+                   "IFNB_down" = rownames(downregulated_IFNB))
 goterm_results_48 <- list()
 
 # go term enrichment analysis for every cluster in the cluster list
@@ -1179,7 +1387,7 @@ names(goterm_results_48) <- names(list_genes)
 
 for (i in seq_along(goterm_results_48)) {
   visualize_GO_enrichment(goterm_results_48[[i]], paste(names(goterm_results_48)[i], sep = " "),
-                          save_path = paste(i, ".png", sep = ""))
+                          save_path = paste("GOterms_t48_", names(goterm_results_48)[i], ".svg", sep = ""))
 }
 ```
 
@@ -1187,16 +1395,16 @@ for (i in seq_along(goterm_results_48)) {
 ## T = 72H
 
 
-```{r compare INFB with virus infection t72, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
+```{r compare IFNB with virus infection t72, echo=FALSE, fig.width=8, fig.height=5, message=FALSE, warning=FALSE}
 
-# compare INFB and virus infection in venn diagram
-results_INFB <- results_list$Condition_IFNB
-upregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange < -1.5, ]
-downregulated_INFB <- results_INFB[!is.na(results_INFB$padj) &
-                            results_INFB$padj < 0.01 &
-                           results_INFB$log2FoldChange > 1.5, ]
+# compare IFNB and virus infection in venn diagram
+results_IFNB <- results_list$Condition_IFNB
+upregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange < -1.5, ]
+downregulated_IFNB <- results_IFNB[!is.na(results_IFNB$padj) &
+                            results_IFNB$padj < 0.01 &
+                           results_IFNB$log2FoldChange > 1.5, ]
 
 downregulated_A2_72 <- results_A2[[3]][!is.na(results_A2[[3]]$padj) &
                             results_A2[[3]]$padj < 0.01 &
@@ -1215,16 +1423,18 @@ upregulated_B3_72 <- results_B3[[3]][!is.na(results_B3[[3]]$padj) &
 # plot the venn diagram with ggvenn
 venn_upregulated <- ggvenn(list("A2" = rownames(upregulated_A2_72),
                           "B3" = rownames(upregulated_B3_72),
-                          "INFB" = rownames(upregulated_INFB)), 
+                          "IFNB" = rownames(upregulated_IFNB)), 
                            fill_color = c("lightblue", "lightgreen", "lightpink"))
 
 venn_downregulated <- ggvenn(list("A2" = rownames(downregulated_A2_72),
                           "B3" = rownames(downregulated_B3_72),
-                          "INFB" = rownames(downregulated_INFB)), 
+                          "IFNB" = rownames(downregulated_IFNB)), 
                              fill_color = c("lightblue", "lightgreen", "lightpink"))
 
-venn_upregulated + ggtitle("Upregulated genes in INFB and A2, B3 (t=72) virus infection")
-venn_downregulated + ggtitle("Downregulated genes in INFB and A2, B3 (t=72) virus infection")
+venn_upregulated + ggtitle("Upregulated genes in IFNB and A2, B3 (t=72) virus infection")
+ggsave("data/plots/venn_upregulated_t72.svg")
+venn_downregulated + ggtitle("Downregulated genes in IFNB and A2, B3 (t=72) virus infection")
+ggsave("data/plots/venn_downregulated_t72.svg")
 
 
 goterm_results_72 <- list()
@@ -1259,7 +1469,7 @@ names(goterm_results_72) <- names(list_genes)
 
 for (i in seq_along(goterm_results_72)) {
   visualize_GO_enrichment(goterm_results_72[[i]], paste(names(goterm_results_72)[i], sep = " "),
-                          save_path = paste(i, ".png", sep = ""))
+                          save_path = paste("GOterms_t72_", names(goterm_results_72)[i], ".svg", sep = ""))
 }
 
 ```
@@ -1270,12 +1480,12 @@ for (i in seq_along(goterm_results_72)) {
 generate_venn <- function(upregulated, downregulated, title_up, title_down) {
   venn_upregulated <- ggvenn(list("A2" = rownames(upregulated$A2),
                                    "B3" = rownames(upregulated$B3),
-                                   "INFB" = rownames(upregulated$INFB)), 
+                                   "IFNB" = rownames(upregulated$IFNB)), 
                              fill_color = c("lightblue", "lightgreen", "lightpink"))
   
   venn_downregulated <- ggvenn(list("A2" = rownames(downregulated$A2),
                                      "B3" = rownames(downregulated$B3),
-                                     "INFB" = rownames(downregulated$INFB)), 
+                                     "IFNB" = rownames(downregulated$IFNB)), 
                                fill_color = c("lightblue", "lightgreen", "lightpink"))
   
   venn_upregulated + ggtitle(title_up)
@@ -1302,7 +1512,7 @@ perform_go_enrichment <- function(sign_genes) {
 
 # Define a function to visualize GO term enrichment
 visualize_go_enrichment <- function(goterm_results, name) {
-  visualize_GO_enrichment(goterm_results, name, save_path = paste(name, ".png", sep = ""))
+  visualize_GO_enrichment(goterm_results, name, save_path = paste(name, ".svg", sep = ""))
 }
 
 # Loop over different time points
@@ -1326,19 +1536,19 @@ for (time_point in c("24", "48", "72")) {
                                                                  result$padj < 0.01 &
                                                                  result$log2FoldChange > 1.5, ])
   
-  upregulated_INFB <- results_list$Condition_IFNB[!is.na(results_list$Condition_IFNB$padj) &
+  upregulated_IFNB <- results_list$Condition_IFNB[!is.na(results_list$Condition_IFNB$padj) &
                                                    results_list$Condition_IFNB$padj < 0.01 &
                                                    results_list$Condition_IFNB$log2FoldChange < -1.5, ]
   
-  downregulated_INFB <- results_list$Condition_IFNB[!is.na(results_list$Condition_IFNB$padj) &
+  downregulated_IFNB <- results_list$Condition_IFNB[!is.na(results_list$Condition_IFNB$padj) &
                                                      results_list$Condition_IFNB$padj < 0.01 &
                                                      results_list$Condition_IFNB$log2FoldChange > 1.5, ]
   
-  venn_titles <- c(paste("Upregulated genes in INFB and A2, B3 (t=", time_point, ") virus infection", sep = ""),
-                   paste("Downregulated genes in INFB and A2, B3 (t=", time_point, ") virus infection", sep = ""))
+  venn_titles <- c(paste("Upregulated genes in IFNB and A2, B3 (t=", time_point, ") virus infection", sep = ""),
+                   paste("Downregulated genes in IFNB and A2, B3 (t=", time_point, ") virus infection", sep = ""))
   
-  generate_venn(upregulated = list(A2 = upregulated_A2[[1]], B3 = upregulated_B3[[1]], INFB = upregulated_INFB),
-                downregulated = list(A2 = downregulated_A2[[1]], B3 = downregulated_B3[[1]], INFB = downregulated_INFB),
+  generate_venn(upregulated = list(A2 = upregulated_A2[[1]], B3 = upregulated_B3[[1]], IFNB = upregulated_IFNB),
+                downregulated = list(A2 = downregulated_A2[[1]], B3 = downregulated_B3[[1]], IFNB = downregulated_IFNB),
                 title_up = venn_titles[1],
                 title_down = venn_titles[2])
   
@@ -1346,20 +1556,19 @@ for (time_point in c("24", "48", "72")) {
                      A2_down = rownames(downregulated_A2[[1]]),
                      B3_up = rownames(upregulated_B3[[1]]),
                      B3_down = rownames(downregulated_B3[[1]]),
-                     INFB_up = rownames(upregulated_INFB),
-                     INFB_down = rownames(downregulated_INFB))
+                     IFNB_up = rownames(upregulated_IFNB),
+                     IFNB_down = rownames(downregulated_IFNB))
   
   goterm_results <- lapply(list_genes, perform_go_enrichment)
   names(goterm_results) <- names(list_genes)
   
   for (i in seq_along(goterm_results)) {
-    visualize_go_enrichment(goterm_results[[i]], paste(names(goterm_results)[i], "_t_", time_point, sep = ""))
+    visualize_go_enrichment(goterm_results[[i]], paste(names(goterm_results)[i], "_t_", time_point, sep = ""), save_path = paste("data/plots/", i, "_t_", time_point, ".svg", sep = "")
   }
 }
 
 
 ```
-
 
 
 
