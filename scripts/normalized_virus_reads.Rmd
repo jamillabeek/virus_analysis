@@ -159,6 +159,7 @@ colnames(cov_data) <- c("Virus", "Position", "Coverage", "cov", "sample", "timep
 cov_data <- cov_data[, c("Virus", "Position", "Coverage", "sample", "timepoint", "replicate")]
 
 
+
 ```
 
 ```{r plot coverage, echo=FALSE}
@@ -230,6 +231,10 @@ for (sample_name in names(mut_list)) {
   mut_list[[sample_name]]$normalized_mutations <- (mut_list[[sample_name]][,8] + mut_list[[sample_name]][,10] + mut_list[[sample_name]][,12]) / mut_list[[sample_name]][,4]
 }
 
+# keep only mutations where coverage is above 1000
+for (sample_name in names(mut_list)) {
+  mut_list[[sample_name]] <- mut_list[[sample_name]][mut_list[[sample_name]][,4] > 1000,]
+}
 
 
 
@@ -245,7 +250,6 @@ mut_data$sample <- rownames(mut_data)
 
 mut_data <- mut_data %>% separate(sample, c("mut", "sample", "timepoint", "replicate"), sep = "_")
 mut_data$replicate <- gsub("\\..*", "", mut_data$replicate)
-
 
 
 # Combine sample and timepoint into a new variable

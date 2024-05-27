@@ -25,6 +25,11 @@ library(GOstats)
 library(reshape2)
 library(VennDiagram)
 library(ggvenn)
+library(clusterProfiler)
+library(AnnotationDbi)
+library(enrichplot)
+
+library(readr)
 ```
 
 
@@ -324,9 +329,15 @@ B3_72 <- rowMeans(counts_B3_72[, 1:3])
 B3_72 <- as.data.frame(B3_72)
 colnames(B3_72) <- "72"
 
-# create table with genes as rows, mean counts as cols: mock, 24, 48, 72
+IFNB <- rowMeans(counts_IFNB[, 1:3])
+IFNB <- as.data.frame(IFNB)
+colnames(IFNB) <- "IFNB"
+
+# create table with genes as rows, mean counts as cols: mock, 24, 48, 72, INFB
 unique_genes$mock <- mock$mock[match(unique_genes$.,
                                                           rownames(A2_24))]
+unique_genes$"IFNB" <- IFNB$"IFNB"[match(unique_genes$.,
+                                                          rownames(IFNB))]
 unique_genes$"A2_24h" <- A2_24$"24"[match(unique_genes$.,
                                                           rownames(A2_24))]
 unique_genes$"A2_48h" <- A2_48$"48"[match(unique_genes$.,
@@ -339,6 +350,7 @@ unique_genes$"B3_48h" <- B3_48$"48"[match(unique_genes$.,
                                                           rownames(B3_48))]
 unique_genes$"B3_72h" <- B3_72$"72"[match(unique_genes$.,
                                                           rownames(B3_72))]
+
 
 rownames(unique_genes) <- unique_genes$.
 unique_genes <- unique_genes[, -1]
@@ -407,15 +419,30 @@ combined_long <- melt(combined, id.vars = c("time", "regulation"))
 
 combined_long$regulation <- factor(combined_long$regulation, levels = c("up", "down"))
 
-ggplot(combined_long, aes(x = variable, y = value, fill = regulation)) +
-  geom_bar(stat = "identity", position = "stack") +
+barchart <- ggplot(combined_long, aes(x = variable, y = value, fill = regulation)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
   labs(
     title = "Number of differentially expressed genes",
     x = "Time and Virus", y = "Count", fill = "Regulation") +
   scale_fill_manual(values = c("down" = "cornflowerblue", "up" = "indianred2")) +
+  facet_wrap(~time) + 
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~time)  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.key.width = unit(0.5, "cm"),  
+        legend.key.height = unit(0.3, "cm"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 12),
+        panel.border = element_blank()) + 
+  theme(axis.line = element_line(color = "black")) 
+
+print(barchart)
+ggsave("data/plots/barchart.svg", barchart, bg = "transparent")
 #  theme(panel.margin = grid::unit(1.25, "lines"))
 
 # same plot but with percentage
@@ -424,18 +451,36 @@ combined_fraction <- rbind(cbind(fractions_24, time = "24h"), cbind(fractions_48
 combined_fraction_long <- melt(combined_fraction, id.vars = c("time", "regulation"))
 
 # add actual counts to bars
-# should the A2 an B3 bars only include unique genes or all signiifcant genes?
+# should the A2 an B3 bars only include unique genes or all significant genes?
 combined_fraction_long$regulation <- factor(combined_fraction_long$regulation, levels = c("up", "down"))
 
-ggplot(combined_fraction_long, aes(x = variable, y = value, fill = regulation)) +
-  geom_bar(stat = "identity", position = "stack") +
+barchart_percentage <- ggplot(combined_fraction_long, aes(x = variable, y = value, fill = regulation)) +
+  geom_bar(stat = "identity", position = "stack", color = "black") +
   labs(
     title = "Percentage of up- or downregulated genes per timepoint in A2 and B3",
     x = "Time and Virus", y = "Percentage", fill = "Regulation") +
   scale_fill_manual(values = c("down" = "cornflowerblue", "up" = "indianred2")) +
-  theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~time)
+  facet_wrap(~time) + 
+    theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 10, color = "black"),
+        axis.title = element_text(size = 12, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        legend.key.width = unit(0.5, "cm"),  
+        legend.key.height = unit(0.3, "cm"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 12),
+        panel.border = element_blank()) + 
+  theme(axis.line = element_line(color = "black")) 
+
+print(barchart_percentage)
+ggsave("data/plots/barchart_percentage.svg", barchart_percentage, bg = "transparent") 
+
+
 
 ```
 
@@ -821,7 +866,7 @@ pheatmap <- pheatmap(unique_genes,
                         cluster_rows = TRUE, 
                         cluster_cols = FALSE, 
                         fontsize = 5,
-                     gaps_col = c(1, 4),
+                     gaps_col = c(1, 2, 5),
                         main = "Heatmap for gene expression as a function of time in virus infected neurons")
 
 ggsave("data/plots/heatmap.svg", plot = pheatmap, width = 5, height = 7, bg = "transparent")
@@ -1074,6 +1119,8 @@ visualize_GO_enrichment <- function(goterm_results, title_prefix, save_path = NU
   # Plot the visualization
   plot_obj <- ggplot(goterm_top20, aes(x = Term, y = -log10(padj))) +
     geom_point() +
+    labs(size = expression(-log[10](adjusted~italic(P)~value)),
+         color = expression(-log[10](adjusted~italic(P)~value))) +
     coord_flip() +
     ylab(expression(-log[10](adjusted~italic(P)~value))) + 
     ggtitle(title_prefix) +
@@ -1107,6 +1154,68 @@ for (i in seq_along(goterm_results)) {
 
 
 
+
+```
+```{r summarize results, echo=FALSE}
+
+enrich_summary <- list()
+# attempt to make pretty plots 
+
+for (i in 1:length(goterm_results)) {
+  enrich_summary[[i]] <- summary(goterm_results[[i]])
+  enrich_summary[[i]] <- enrich_summary[[i]] %>% filter(Count > 5) %>% filter(Count < 500)
+  
+  enrich_summary[[i]]$padj <- p.adjust(enrich_summary[[i]]$Pvalue, method = "BH")
+  
+  # Select the top 20 GO terms
+  goterm_top20 <- enrich_summary[[i]][order(enrich_summary[[i]]$padj)[1:20],]
+
+  # Plot the p-values of the top 20 GO terms
+  goterm_top20$Term <- factor(goterm_top20$Term, 
+                              levels = goterm_top20$Term[order(goterm_top20$padj, decreasing = TRUE)])
+  
+  # adjust p-values
+  enrich_summary[[i]]$padj <- p.adjust(enrich_summary[[i]]$Pvalue, method = "BH")
+}
+
+# filter for top5 terms
+top_terms_list <- lapply(enrich_summary, function(x) {
+  x %>% arrange(padj) %>% head(5)
+})
+
+
+# Add cluster information
+for (i in seq_along(top_terms_list)) {
+  top_terms_list[[i]]$Cluster <- paste("Cluster", i)
+}
+
+# Step 2: Combine these terms into a single data frame
+top_terms_df <- do.call(rbind, top_terms_list)
+
+top_terms_df <- top_terms_df %>%
+  separate(OddsRatio, into = c("num", "den"), sep = "/", convert = TRUE) %>%
+  mutate(OddsRatio = num / den) %>%
+  select(-num, -den)
+
+# Step 3: Create the plot
+plot <- ggplot(top_terms_df, aes(x = Cluster, y = Term, color = padj, size = OddsRatio)) +
+  geom_point() +
+  scale_color_continuous(low = "red", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10, color = "black"),
+        axis.text.y = element_text(size = 14, color = "black"),
+        plot.title = element_text(size = 14, face = "bold", hjust = 0.5, color = "black"),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA, color = NA),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_blank()) +
+  theme(axis.line = element_line(color = "black")) +
+  ggtitle("Top 5 GO Terms for Each Cluster") +
+  labs(color = "padj", size = "OddsRatio")
+
+# Print and save the plot
+print(plot)
+ggsave("data/plots/combined_enrichGO.svg", plot, width = 10, height = 7)
 
 ```
 
